@@ -10,10 +10,11 @@ Description: |
   environment on EC2, and to deploy Phonebook Application on Flask Server after downloading the app code 
   from Github repository.
 Parameters:
+
   Subnets:
     Description: Choose you subnets
     Type: List<AWS::EC2::Subnet::Id>
-    
+
   KeyName:
     Description: Please enter your Key pair
     Type: AWS::EC2::KeyPair::KeyName
@@ -23,14 +24,16 @@ Parameters:
     Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64'
 
   myVPC:
-    Description: choose your vpc 
+    Description: choose your vpc
     Type: AWS::EC2::VPC::Id
 
   myDbname: 
     Type: AWS::SSM::Parameter::Value<String>
-    Default: /clarusway/phonebook/dbname  
+    Default: /clarusway/phonebook/dbname
   
 Resources:
+
+
   ASG:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties: 
@@ -55,6 +58,17 @@ Resources:
       LoadBalancerArn: !Ref ALB # Required
       Port: 80 # Required
       Protocol: HTTP  # Required
+
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4 
+      Scheme: internet-facing
+      SecurityGroups:
+        - !GetAtt aLBSecGrp.GroupId
+      Subnets: !Ref Subnets
+      Type: application
+
   LT:
     Type: AWS::EC2::LaunchTemplate
     Properties:
@@ -86,9 +100,10 @@ Resources:
                 echo "${MyDBURI}" > /home/ec2-user/dbserver.endpoint
                 cd /home/ec2-user
                 TOKEN=$(aws --region=us-east-1 ssm get-parameter --name /clarusway/phonebook/token --with-decryption --query 'Parameter.Value' --output text)
-                git clone https://$TOKEN@github.com/hasantoygun23/phonebook-web-app.git
+                git clone https://$TOKEN@github.com/awsdevopsteam/phonebook-web-app.git
                 python3 /home/ec2-user/phonebook-web-app/solutions/phonebook-app.py
               - MyDBURI: !GetAtt rDSInstance.Endpoint.Address
+
   TG:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties: 
@@ -122,14 +137,17 @@ Resources:
       Description: allow ssm
       ManagedPolicyArns: 
         - arn:aws:iam::aws:policy/AmazonSSMFullAccess
-      RoleName: hsn-SSM-phonebook
+      RoleName: osvaldo-SSM-phonebook-19
+
+
+
   rDSInstance:
     Type: AWS::RDS::DBInstance
     Properties:
       AllocatedStorage: 20
       BackupRetentionPeriod: 0
       DBInstanceClass: db.t3.micro
-      DBInstanceIdentifier: hsn-phonebook
+      DBInstanceIdentifier: osvaldo-phonebook-19
       DBName: !Ref myDbname # '{{resolve:ssm:/clarusway/phonebook/dbname:1}}'
       DBSecurityGroups: 
         - !Ref rDSSecGrp
@@ -138,8 +156,6 @@ Resources:
       EngineVersion: 8.0.35
       MasterUserPassword: '{{resolve:ssm-secure:/clarusway/phonebook/password:1}}'
       MasterUsername: '{{resolve:ssm:/clarusway/phonebook/username:1}}'
-      MultiAZ: false
-      Port: 3306
       PubliclyAccessible: true
     DeletionPolicy: Delete
 
@@ -148,50 +164,47 @@ Resources:
     Properties:
       DBSecurityGroupIngress: # Required
         - EC2SecurityGroupId: !GetAtt eC2SecGrp.GroupId
-      GroupDescription: Allow 3306 from ec2sec grp # Required
+      GroupDescription: allow 3306 from ec2secgrp # Required
       Tags: 
-        - Key: name
-          Value: hsn-phonebook-secgrp  
-
+        - Key: Name
+          Value: osvaldo-phonebook-RDS-Sec-19
 
   eC2SecGrp:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow ssh from anywhere and http from alb # Required
-      GroupName: hsn-phonebook-ec2-secgrp
+      GroupDescription: allow ssh from anywhere and http from ALB # Required
+      GroupName: osvaldo-phonebook-EC2-19
       SecurityGroupIngress: 
-      - SourceSecurityGroupId: !GetAtt aLBSecGrp.GroupId #!Ref aLBSecGrp
-        FromPort: 80
-        IpProtocol: tcp
-        ToPort: 80
-        
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !GetAtt aLBSecGrp.GroupId  # !Ref aLBSecGrp
       VpcId: !Ref myVPC
 
   aLBSecGrp:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow ssh and http  # Required
-      GroupName: hsn-phonebook-alb-secgrp
-      SecurityGroupIngress: 
+      GroupDescription: Allow ssh and http # Required
+      GroupName: osvaldo-phonebook-ALB-19
+      SecurityGroupIngress:
       - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
-
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
       VpcId: !Ref myVPC
-
+    
 Outputs:
   WebsiteURL:
-    Value: !Sub
+    Value: !Sub 
       - http://${ALBAddress}
       - ALBAddress: !GetAtt ALB.DNSName
     Description: Phonebook Application Load Balancer URL
-  
