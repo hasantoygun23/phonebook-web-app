@@ -13,7 +13,7 @@ Parameters:
   Subnets:
     Description: Choose you subnets
     Type: List<AWS::EC2::Subnet::Id>
-    
+
   KeyName:
     Description: Please enter your Key pair
     Type: AWS::EC2::KeyPair::KeyName
@@ -45,7 +45,17 @@ Resources:
       TargetGroupARNs:
         - !Ref TG
       VPCZoneIdentifier: !Ref Subnets # not array
-
+  
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4 
+      Scheme: internet-facing
+      SecurityGroups:
+        - !GetAtt aLBSecGrp.GroupId
+      Subnets: !Ref Subnets
+      Type: application
+      
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties: 
